@@ -1,3 +1,14 @@
 apiVersion: v1
-entries: {}
-generated: "2020-12-22T20:03:24.204405+08:00"
+entries:
+  vada:
+  - apiVersion: v2
+    appVersion: latest
+    created: "2020-12-22T20:11:14.105709+08:00"
+    description: A Helm chart for VADA
+    digest: 408476f2a2cca0cc2d024703c0b74e133f3455744e7870016323455ad2df96cb
+    name: vada
+    type: application
+    urls:
+    - https://pu-sds.github.io/helm-chart/vada-0.1.0.tgz
+    version: 0.1.0
+generated: "2020-12-22T20:11:14.104091+08:00"

@@ -1,0 +1,182 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vada.fullname" . }}
+  labels:
+    {{- include "vada.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "vada.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "vada.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vada.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: vada-portal
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          #readinessProbe:
+          #  httpGet:
+          #    path: /
+          #    port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          command:
+            - python
+          args:
+            - run.py
+          env:
+            - name: CELERY_BROKER_URL
+              value: {{ .Values.celery_broker_url | quote }}
+            - name: EMAIL_USERNAME
+              value: {{ .Values.email_username | quote }}
+            - name: EMAIL_FROM
+              value: {{ .Values.email_from | quote }}
+            - name: EMAIL_SUBJECT
+              value: {{ .Values.email_subject | quote }}
+            - name: DB_HOSTNAME
+              value: {{ .Values.db_hostname | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.db_username | quote }}
+            - name: DB_DBNAME
+              value: {{ .Values.db_dbname | quote }}
+            - name: VADA_URL
+              value: {{ .Values.url | quote }}
+            - name: ELASTICSEARCH_HOST
+              value: {{ .Values.elasticsearch_host | quote }}
+            - name: CSRF_SESSION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.csrf_session_key_secret_name }}
+                  key: vada-csrf-session-key
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret_key_secret_name }}
+                  key: vada-secret-key
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.email_password_secret_name }}
+                  key: vada-email-password
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db_password_secret_name }}
+                  key: vada-db-password-secret
+          volumeMounts:
+          - name: input
+            mountPath: /app/input
+        - name: vada-worker
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          #livenessProbe:
+          #  httpGet:
+          #    path: /
+          #    port: http
+          #readinessProbe:
+          #  httpGet:
+          #    path: /
+          #    port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          command:
+            - celery 
+          args:
+            - worker
+            - -B
+            - -l
+            - info
+            - -A
+            - app:celery
+
+          env:
+            - name: CELERY_BROKER_URL
+              value: {{ .Values.celery_broker_url | quote }}
+            - name: EMAIL_USERNAME
+              value: {{ .Values.email_username | quote }}
+            - name: EMAIL_FROM
+              value: {{ .Values.email_from | quote }}
+            - name: EMAIL_SUBJECT
+              value: {{ .Values.email_subject | quote }}
+            - name: DB_HOSTNAME
+              value: {{ .Values.db_hostname | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.db_username | quote }}
+            - name: DB_DBNAME
+              value: {{ .Values.db_dbname | quote }}
+            - name: VADA_URL
+              value: {{ .Values.url | quote }}
+            - name: ELASTICSEARCH_HOST
+              value: {{ .Values.elasticsearch_host | quote }}
+            - name: CSRF_SESSION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.csrf_session_key_secret_name }}
+                  key: vada-csrf-session-key
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret_key_secret_name }}
+                  key: vada-secret-key
+            - name: EMAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.email_password_secret_name }}
+                  key: vada-email-password
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.db_password_secret_name }}
+                  key: vada-db-password-secret
+          volumeMounts:
+          - name: input
+            mountPath: /app/input
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: input
+      {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "vada.fullname" . }}
+      {{- else }}
+          emptyDir: {}
+      {{- end -}}
